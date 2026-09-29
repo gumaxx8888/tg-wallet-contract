@@ -98,6 +98,9 @@ struct (0xFBBA99C7) ChangePublicKeyRequestI {
     /// First, by the current key (SignedRequest, the incoming message itself).
     /// Second, by the new key (rotation proof).
     rotationSignature: Cell<bits512>
+    /// Used to calculate old private key after changing it: to render old encrypted messages.
+    /// Must contain XOR (hash(newPrivateKey+salt), currentPrivateKey).
+    encryptedOldPrivateKey: Cell<bits256>
 }
 
 /// Change the wallet signing key.
@@ -112,4 +115,12 @@ struct (0xFBBA99C8) ChangePublicKeyRequestE {
     /// First, by the current key (SignedRequest, the incoming message itself).
     /// Second, by the new key (rotation proof).
     rotationSignature: Cell<bits512>
+    /// Used to calculate old private key after changing it: to render old encrypted messages.
+    /// Must contain XOR (hash(newPrivateKey+salt), currentPrivateKey).
+    encryptedOldPrivateKey: Cell<bits256>
+}
+
+/// External-out emitted when a key has been changed. Used by indexers.
+struct (0xEBA19948) OnKeyHasBeenChangedEvent {
+    encryptedOldPrivateKey: bits256
 }
