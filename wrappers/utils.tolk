@@ -4,6 +4,8 @@ import "@acton/emulation/config"
 import "@acton/emulation/network"
 import "@acton/emulation/testing"
 import "@acton/testing/expect"
+import "@acton/types/big_array"
+import "@acton/types/message"
 import "@contracts/WalletTg/WalletTg"
 import "@contracts/WalletTg/messages"
 import "@contracts/WalletTg/revisions"
@@ -125,11 +127,13 @@ fun prepareChangePublicKeyWithProofI(
     header: SeqnoHeader,
     newPublicKey: uint256,
     rotationSignature: bits512,
+    encryptedOldPrivateKey: bits256,
 ): SignedRequest<AllowedInternalMsg> {
     val request = ChangePublicKeyRequestI {
         header,
         newPublicKey,
         rotationSignature: rotationSignature.toCell(),
+        encryptedOldPrivateKey: encryptedOldPrivateKey.toCell(),
     };
     val signature = crypto.sign(currentKey.privateKey, request.toCell()) as bits512;
     return { signature, request };
@@ -140,11 +144,13 @@ fun prepareChangePublicKeyI(
     header: SeqnoHeader,
     walletAddress: address,
     newKey: KeyPair,
+    encryptedOldPrivateKey: bits256,
 ): SignedRequest<AllowedInternalMsg> {
     val request = ChangePublicKeyRequestI {
         header,
         newPublicKey: newKey.publicKey,
         rotationSignature: createKeyRotationProof(walletAddress, newKey).toCell(),
+        encryptedOldPrivateKey: encryptedOldPrivateKey.toCell(),
     };
     val signature = crypto.sign(currentKey.privateKey, request.toCell()) as bits512;
     return { signature, request };
@@ -155,11 +161,13 @@ fun prepareChangePublicKeyWithProofE(
     header: SeqnoHeader,
     newPublicKey: uint256,
     rotationSignature: bits512,
+    encryptedOldPrivateKey: bits256,
 ): SignedRequest<AllowedExternalMsg> {
     val request = ChangePublicKeyRequestE {
         header,
         newPublicKey,
         rotationSignature: rotationSignature.toCell(),
+        encryptedOldPrivateKey: encryptedOldPrivateKey.toCell(),
     };
     val signature = crypto.sign(currentKey.privateKey, request.toCell()) as bits512;
     return { signature, request };
@@ -170,14 +178,27 @@ fun prepareChangePublicKeyE(
     header: SeqnoHeader,
     walletAddress: address,
     newKey: KeyPair,
+    encryptedOldPrivateKey: bits256,
 ): SignedRequest<AllowedExternalMsg> {
     val request = ChangePublicKeyRequestE {
         header,
         newPublicKey: newKey.publicKey,
         rotationSignature: createKeyRotationProof(walletAddress, newKey).toCell(),
+        encryptedOldPrivateKey: encryptedOldPrivateKey.toCell(),
     };
     val signature = crypto.sign(currentKey.privateKey, request.toCell()) as bits512;
     return { signature, request };
+}
+
+fun assertKeyChangedEvent(result: SendResultList, walletAddress: address, encryptedOldPrivateKey: bits256): void {
+    expect(result.size()).toEqual(1);
+    expect(result.at(0).externals.size()).toEqual(1);
+    val event = result.findExternalOutMessage<OnKeyHasBeenChangedEvent>({
+        from: walletAddress,
+        to: createAddressNone(),
+    });
+    expect(event).toBeNotNull();
+    expect(event!.loadBody().encryptedOldPrivateKey).toEqual(encryptedOldPrivateKey);
 }
 
 fun makeTransferToSend(dest: address, value: coins): MessageToSend {

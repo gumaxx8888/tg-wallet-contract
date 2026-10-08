@@ -17,6 +17,7 @@ import "@contracts/WalletTg/messages"
 
 const E2E_BENCH_KEY_SEED = 0x57560001
 const E2E_BENCH_NEW_KEY_SEED = 0x57560002
+const E2E_BENCH_ENCRYPTED_OLD_PRIVATE_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".hexToSlice() as bits256
 const E2E_BENCH_NOW = 1000
 const E2E_BENCH_VALID_UNTIL = 2000
 
@@ -146,6 +147,7 @@ fun sendE2EBenchChangeKeyExternal(
         seqnoHeader(seqno, E2E_BENCH_VALID_UNTIL),
         fixture.wallet.address,
         newKey,
+        E2E_BENCH_ENCRYPTED_OLD_PRIVATE_KEY,
     );
     val result = fixture.wallet.requestExternal(req);
 
@@ -165,6 +167,7 @@ fun sendE2EBenchChangeKeyInternal(
         seqnoHeader(seqno, E2E_BENCH_VALID_UNTIL),
         fixture.wallet.address,
         newKey,
+        E2E_BENCH_ENCRYPTED_OLD_PRIVATE_KEY,
     );
     val result = fixture
         .wallet
@@ -261,7 +264,7 @@ get fun `test e2e full chain: EXTERNAL change key`() {
     val result = sendE2EBenchChangeKeyExternal(fixture, newKey);
     result.giveName("e2e full-chain EXTERNAL change key");
 
-    expect(result.size()).toEqual(1);
+    assertKeyChangedEvent(result, fixture.wallet.address, E2E_BENCH_ENCRYPTED_OLD_PRIVATE_KEY);
     expect(result).toHaveTx({ exitCode: 0 });
 }
 
@@ -272,7 +275,7 @@ get fun `test e2e full chain: INTERNAL change key`() {
     val result = sendE2EBenchChangeKeyInternal(fixture, newKey);
     result.giveName("e2e full-chain INTERNAL change key");
 
-    expect(result.size()).toEqual(1);
+    assertKeyChangedEvent(result, fixture.wallet.address, E2E_BENCH_ENCRYPTED_OLD_PRIVATE_KEY);
     expect(result).toHaveSuccessfulTx({
         from: fixture.deployer.address,
         to: fixture.wallet.address,

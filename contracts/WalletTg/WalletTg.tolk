@@ -50,6 +50,16 @@ fun checkRotationProof(rotationSignature: Cell<bits512>, newPublicKey: uint256):
     );
 }
 
+// Send an ext-out event "public key has been changed".
+// Used by indexers to create actions, which are used by clients to decrypt messages encrypted by old private key.
+fun sendOnKeyChangedEvent(encryptedOldPrivateKey: bits256) {
+    val eventMsg = createExternalLogMessage({
+        dest: createAddressNone(),
+        body: OnKeyHasBeenChangedEvent { encryptedOldPrivateKey }
+    });
+    eventMsg.send(SEND_MODE_REGULAR);   // not +2
+}
+
 @on_bounced_policy("manual")    // tell the compiler "don't insert code to filter out bounced messages"
 fun onInternalMessage(in: InMessage) {
     // we should NOT throw until the signature proves that the owner signed the message;
@@ -89,10 +99,13 @@ fun onInternalMessage(in: InMessage) {
 
             assert (storage.publicKey != msg.newPublicKey) throw Errors.NewKeyMustDiffer;
             assert (checkRotationProof(msg.rotationSignature, msg.newPublicKey)) throw Errors.NewKeySignatureIsInvalid;
+            val encryptedOldPrivateKey = msg.encryptedOldPrivateKey.load();
 
             storage.seqno += 1;
             storage.publicKey = msg.newPublicKey;
             storage.save();
+
+            sendOnKeyChangedEvent(encryptedOldPrivateKey);
         }
 
         else => {
@@ -145,11 +158,16 @@ fun onExternalMessage(inMsgBody: slice) {
 
             assert (storage.publicKey != msg.newPublicKey) throw Errors.NewKeyMustDiffer;
             assert (checkRotationProof(msg.rotationSignature, msg.newPublicKey)) throw Errors.NewKeySignatureIsInvalid;
+            val encryptedOldPrivateKey = msg.encryptedOldPrivateKey.load();
             acceptExternalMessage();
 
             storage.seqno += 1;
             storage.publicKey = msg.newPublicKey;
             storage.save();
+
+            // sending could fail only if a contract has not enough balance to send ext-out;
+            // it will roll back, but it's okay: the contract can't be drained, it just hasn't any balance
+            sendOnKeyChangedEvent(encryptedOldPrivateKey);
         }
 
         else => {
